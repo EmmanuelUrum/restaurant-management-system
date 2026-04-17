@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Restaurant Management System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #f4f4f4;
+            color: #222;
+        }
+
+        header {
+            background-color: #8B0000;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        section {
+            background: white;
+            margin: 20px auto;
+            padding: 20px;
+            width: 85%;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            color: #8B0000;
+            margin-top: 0;
+        }
+
+        input, button, select {
+            padding: 8px;
+            margin: 5px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #8B0000;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #a40000;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        table, th, td {
+            border: 1px solid #bbb;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        canvas {
+            margin-top: 20px;
+            max-width: 700px;
+        }
+
+        .status {
+            margin-top: 10px;
+            font-weight: bold;
+            color: green;
+        }
+
+        .flex-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Restaurant Management System</h1>
+</header>
+
+<!-- ADD CUSTOMER -->
+<section>
+    <h2>1. Add Customer</h2>
+    <div class="flex-row">
+        <input id="custName" placeholder="Name">
+        <input id="custPhone" placeholder="Phone">
+        <input id="custEmail" placeholder="Email">
+        <button onclick="addCustomer()">Add Customer</button>
+    </div>
+    <p id="customerStatus" class="status"></p>
+</section>
+
+<!-- VIEW MENU -->
+<section>
+    <h2>2. View Menu</h2>
+    <button onclick="loadMenu()">Load Menu</button>
+    <ul id="menuList"></ul>
+</section>
+
+<!-- CREATE ORDER -->
+<section>
+    <h2>3. Create Order</h2>
+
+    <div class="flex-row">
+        <input id="customerId" placeholder="Customer ID" type="number">
+        <input id="staffId" placeholder="Staff ID" type="number">
+        <input id="tableId" placeholder="Table ID" type="number">
+    </div>
+
+    <h3>Add Items to Order</h3>
+    <div class="flex-row">
+        <input id="menuId1" placeholder="Menu ID" type="number" oninput="showAutoRecommendations()">
+        <input id="quantity1" placeholder="Quantity" type="number">
+        <input id="price1" placeholder="Price" type="number" step="0.01">
+    </div>
+
+    <div class="flex-row">
+        <input id="menuId2" placeholder="Menu ID" type="number">
+        <input id="quantity2" placeholder="Quantity" type="number">
+        <input id="price2" placeholder="Price" type="number" step="0.01">
+    </div>
+
+    <button onclick="createOrder()">Create Order</button>
+    <p id="orderResult" class="status"></p>
+</section>
+
+<!-- RECOMMENDATIONS -->
+<section>
+    <h2>4. Recommended Items</h2>
+    <p>Recommendations are automatically generated from the first menu item in the order.</p>
+    <button onclick="showAutoRecommendations()">Show Recommendations for First Item</button>
+    <ul id="recommendationList"></ul>
+</section>
+
+<!-- ANALYTICS -->
+<section>
+    <h2>5. Sales Analytics Dashboard</h2>
+
+    <h3>Revenue Over Time</h3>
+    <table id="revenueTable">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Total Revenue</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <canvas id="revenueChart"></canvas>
+
+    <h3>Top Selling Menu Items</h3>
+    <table id="topItemsTable">
+        <thead>
+            <tr>
+                <th>Item Name</th>
+                <th>Total Sold</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <canvas id="topItemsChart"></canvas>
+
+    <h3>Peak Order Hours</h3>
+    <table id="peakHoursTable">
+        <thead>
+            <tr>
+                <th>Hour</th>
+                <th>Order Count</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <canvas id="peakHoursChart"></canvas>
+
+    <h3>Revenue by Menu Category</h3>
+    <table id="categoryRevenueTable">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Total Revenue</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <canvas id="categoryRevenueChart"></canvas>
+</section>
+
+<script>
+    const BASE_URL = "http://127.0.0.1:5000";
+
+    function addCustomer() {
+        fetch(BASE_URL + '/add_customer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: Math.floor(Math.random() * 10000),
+                name: document.getElementById('custName').value,
+                phone: document.getElementById('custPhone').value,
+                email: document.getElementById('custEmail').value
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('customerStatus').innerText = data.message;
+        })
+        .catch(err => console.error('Add customer error:', err));
+    }
+
+    function loadMenu() {
+        fetch(BASE_URL + '/menu')
+        .then(res => res.json())
+        .then(data => {
+            const list = document.getElementById('menuList');
+            list.innerHTML = "";
+
+            data.forEach(item => {
+                const li = document.createElement('li');
+                li.innerText = `Menu ID: ${item.MenuID} | ${item.ItemName} - $${item.Price} | Category: ${item.Category}`;
+                list.appendChild(li);
+            });
+        })
+        .catch(err => console.error('Menu error:', err));
+    }
+
+    function createOrder() {
+        const items = [];
+
+        const menuId1 = document.getElementById('menuId1').value;
+        const quantity1 = document.getElementById('quantity1').value;
+        const price1 = document.getElementById('price1').value;
+
+        const menuId2 = document.getElementById('menuId2').value;
+        const quantity2 = document.getElementById('quantity2').value;
+        const price2 = document.getElementById('price2').value;
+
+        if (menuId1 && quantity1 && price1) {
+            items.push({
+                menu_id: parseInt(menuId1),
+                quantity: parseInt(quantity1),
+                price: parseFloat(price1)
+            });
+        }
+
+        if (menuId2 && quantity2 && price2) {
+            items.push({
+                menu_id: parseInt(menuId2),
+                quantity: parseInt(quantity2),
+                price: parseFloat(price2)
+            });
+        }
+
+        fetch(BASE_URL + '/create_order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                order_id: Math.floor(Math.random() * 10000),
+                customer_id: parseInt(document.getElementById('customerId').value),
+                staff_id: parseInt(document.getElementById('staffId').value),
+                table_id: parseInt(document.getElementById('tableId').value),
+                items: items
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('orderResult').innerText =
+                `Order created successfully. Order ID: ${data.order_id} | Subtotal: $${data.calculated_subtotal}`;
+
+            showAutoRecommendations();
+        })
+        .catch(err => console.error('Create order error:', err));
+    }
+
+    function showAutoRecommendations() {
+        const firstMenuId = document.getElementById('menuId1').value;
+        const list = document.getElementById('recommendationList');
+        list.innerHTML = "";
+
+        if (!firstMenuId) {
+            const li = document.createElement('li');
+            li.innerText = "Enter the first menu item in the order to see recommendations.";
+            list.appendChild(li);
+            return;
+        }
+
+        fetch(BASE_URL + '/recommend/' + firstMenuId)
+        .then(res => res.json())
+        .then(data => {
+            list.innerHTML = "";
+
+            if (data.length === 0) {
+                const li = document.createElement('li');
+                li.innerText = "No recommendations found for this item.";
+                list.appendChild(li);
+                return;
+            }
+
+            data.forEach(item => {
+                const li = document.createElement('li');
+                li.innerText = `${item.ItemName} | Confidence: ${Number(item.Confidence).toFixed(2)}`;
+                list.appendChild(li);
+            });
+        })
+        .catch(err => {
+            console.error('Recommendation error:', err);
+            const li = document.createElement('li');
+            li.innerText = "Could not load recommendations.";
+            list.appendChild(li);
+        });
+    }
+
+    function loadRevenue() {
+        fetch(BASE_URL + '/analytics/revenue')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.querySelector('#revenueTable tbody');
+                tbody.innerHTML = "";
+
+                const labels = [];
+                const values = [];
+
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.Day}</td>
+                        <td>$${row.TotalRevenue}</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    labels.push(row.Day);
+                    values.push(row.TotalRevenue);
+                });
+
+                new Chart(document.getElementById('revenueChart'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Revenue',
+                            data: values
+                        }]
+                    }
+                });
+            })
+            .catch(err => console.error('Revenue error:', err));
+    }
+
+    function loadTopItems() {
+        fetch(BASE_URL + '/analytics/top-items')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.querySelector('#topItemsTable tbody');
+                tbody.innerHTML = "";
+
+                const labels = [];
+                const values = [];
+
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.ItemName}</td>
+                        <td>${row.TotalSold}</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    labels.push(row.ItemName);
+                    values.push(row.TotalSold);
+                });
+
+                new Chart(document.getElementById('topItemsChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Items Sold',
+                            data: values
+                        }]
+                    }
+                });
+            })
+            .catch(err => console.error('Top items error:', err));
+    }
+
+    function loadPeakHours() {
+        fetch(BASE_URL + '/analytics/peak-hours')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.querySelector('#peakHoursTable tbody');
+                tbody.innerHTML = "";
+
+                const labels = [];
+                const values = [];
+
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.Hour}:00</td>
+                        <td>${row.OrderCount}</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    labels.push(row.Hour + ":00");
+                    values.push(row.OrderCount);
+                });
+
+                new Chart(document.getElementById('peakHoursChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Orders',
+                            data: values
+                        }]
+                    }
+                });
+            })
+            .catch(err => console.error('Peak hours error:', err));
+    }
+
+    function loadCategoryRevenue() {
+        fetch(BASE_URL + '/analytics/category-revenue')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.querySelector('#categoryRevenueTable tbody');
+                tbody.innerHTML = "";
+
+                const labels = [];
+                const values = [];
+
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.Category}</td>
+                        <td>$${row.TotalRevenue}</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    labels.push(row.Category);
+                    values.push(row.TotalRevenue);
+                });
+
+                new Chart(document.getElementById('categoryRevenueChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Category Revenue',
+                            data: values
+                        }]
+                    }
+                });
+            })
+            .catch(err => console.error('Category revenue error:', err));
+    }
+
+    loadRevenue();
+    loadTopItems();
+    loadPeakHours();
+    loadCategoryRevenue();
+</script>
+
+</body>
+</html>
